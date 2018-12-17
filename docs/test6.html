@@ -1,0 +1,312 @@
+<html>
+
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+  <title>Alior Tech Radar</title>
+
+  <script src="d3.v4.min.js"></script>
+  <script src="radar.js"></script>
+
+  <style type="text/css">
+    body {
+      font-family: 'Source Sans Pro', arial, helvetica, sans-serif;
+      padding-bottom: 50px;
+    }
+
+    h3 {
+      margin-top: 50px;
+    }
+
+    li {
+      margin: 25px 50px 0 0;
+    }
+
+    table {
+      width: 1400px;
+      margin: 0 50px 0 50px;
+    }
+
+    td {
+      width: 50%;
+      vertical-align: top;
+      padding-right: 60px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <svg id="radar"></svg>
+
+  <script>
+    radar_visualization({
+      //debug: true,
+      svg_id: "radar",
+      width: 1450,
+      height: 1000,
+      colors: {
+        background: "#fff",
+        grid: "#bbb",
+        inactive: "#ddd",
+      },
+      title: "Tech Radar TEST",
+      quadrants: [
+        {name: "Q0"},
+        {name: "Q1"},
+        {name: "Q2"},
+        {name: "Q3"},
+        {name: "Q4"},
+        {name: "Q5"},
+      ],
+      rings: [
+        {name: "ADOPT", color: "#93c47d"},
+        {name: "TRIAL", color: "#93d2c2"},
+        {name: "ASSESS", color: "#fbdb84"},
+        {name: "HOLD", color: "#efafa9"}
+      ],
+      print_layout: true,
+      // zoomed_quadrant: 0, //not supported
+      //ENTRIES
+      entries: [
+        //Q0
+        {
+          quadrant: 0,
+          ring: 1,
+          label: "Q0R1",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 0,
+          ring: 0,
+          label: "Q0R0-1",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 0,
+          ring: 0,
+          label: "Q0R0-2",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 0,
+          ring: 0,
+          label: "Q0R0-3",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 0,
+          ring: 0,
+          label: "Q0R0-4",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 0,
+          ring: 0,
+          label: "Q0R0-5",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 0,
+          ring: 0,
+          label: "Q0R0-6",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 0,
+          ring: 0,
+          label: "Q0R0-7",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 0,
+          ring: 2,
+          label: "Q0R2",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 0,
+          ring: 3,
+          label: "Q0R3",
+          active: false,
+          moved: 0
+        },
+/**/
+        //Q1
+        {
+          quadrant: 1,
+          ring: 0,
+          label: "Q1R0",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 1,
+          ring: 1,
+          label: "Q1R1",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 1,
+          ring: 2,
+          label: "Q1R2",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 1,
+          ring: 3,
+          label: "Q1R3",
+          active: false,
+          moved: 0
+        },
+/**/
+        //Q2
+        {
+          quadrant: 2,
+          ring: 0,
+          label: "Q2R0",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 2,
+          ring: 1,
+          label: "Q2R1",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 2,
+          ring: 2,
+          label: "Q2R2",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 2,
+          ring: 3,
+          label: "Q2R3",
+          active: false,
+          moved: 0
+        },
+/**/
+        //Q3
+        {
+          quadrant: 3,
+          ring: 0,
+          label: "Q3R0",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 3,
+          ring: 1,
+          label: "Q3R1",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 3,
+          ring: 2,
+          label: "Q3R2",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 3,
+          ring: 3,
+          label: "Q3R3",
+          active: false,
+          moved: 0
+        },
+/**/
+        //Q4
+        {
+          quadrant: 4,
+          ring: 0,
+          label: "Q4R0",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 4,
+          ring: 1,
+          label: "Q4R0",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 4,
+          ring: 2,
+          label: "Q4R2",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 4,
+          ring: 3,
+          label: "Q4R3",
+          active: false,
+          moved: 0
+        },
+/**/
+        //Q5
+        {
+          quadrant: 5,
+          ring: 0,
+          label: "Q5R0",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 5,
+          ring: 1,
+          label: "Q5R0",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 5,
+          ring: 2,
+          label: "Q5R2",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 5,
+          ring: 3,
+          label: "Q5R3 1",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 5,
+          ring: 3,
+          label: "Q5R3 2",
+          active: false,
+          moved: 0
+        },
+        {
+          quadrant: 5,
+          ring: 3,
+          label: "Q5R3 3",
+          active: false,
+          moved: 0
+        },
+/**/
+      ]
+    });
+  </script>
+
+</body>
+</html>
