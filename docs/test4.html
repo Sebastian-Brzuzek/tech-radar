@@ -4,7 +4,8 @@
   <meta http-equiv="Content-type" content="text/html; charset=utf-8">
   <title>Alior Tech Radar</title>
 
-  <script src="d3.v4.min.js"></script>
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+  <!-- script src="d3.v4.min.js"></script -->
   <script src="radar.js"></script>
 
   <style type="text/css">
@@ -51,10 +52,10 @@
       },
       title: "Tech Radar TEST",
       quadrants: [
-        {name: "Q0"},
-        {name: "Q1"},
-        {name: "Q2"},
-        {name: "Q3"},
+        {symbol: "Q0", name: "Quadrant zero"},
+        {symbol: "", name: "Q1 - empty symbol"},
+        {name: "Q2 - no symbol"},
+        {symbol: "Q3", name: "Qadrant 3"},
         //{name: "Q4"},
         //{name: "Q5"},
       ],
