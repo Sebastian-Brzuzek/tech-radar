@@ -23,6 +23,58 @@
 
 function radar_visualization(config) {
 
+  config.legend = config.legend || {};
+  config.legend.label_limit = config.legend.label_limit || 20;
+  config.legend.no_middle = config.legend.no_middle || false;
+  config.legend.split_mode = config.legend.split_mode || 'fixed';
+
+  const legendSegmentSplitAt = (segment, segment_idx, segment_name) => { //legendNextColumn(segment, ring) {
+//console.log('legendSegmentSplitAt - segment: ', segment, segment_idx, segment_name);
+    const ringOffset = 3; //equivalent number of entries for height of ring title
+    const total = segment.reduce((acc,v) => acc + (v.length || 1), 0) + ringOffset * segment.length;
+//console.log('total: ', total);
+    let res = null;
+
+    switch (config.legend.split_mode) {
+      case 'ring': //wrap whole rings to balance columns
+        let acc_ring = 0;
+        for (let r = 0; r < segment.length; r++) {
+          const delta = ringOffset + (segment[r].length || 1);
+          const new_acc_ring = acc_ring + delta;
+//console.log('r, acc_ring, delta', r, acc_ring, delta);
+          if (new_acc_ring > total / 2) {
+            const height_split_before = Math.max(new_acc_ring, total - new_acc_ring);
+            const height_split_after = Math.max(acc_ring, total - acc_ring);
+            res = {
+              ring: height_split_before >= height_split_after ? r : r+1,
+              entry: 0
+            };
+            break;
+          }
+          acc_ring = new_acc_ring;
+        }
+        break;
+      case 'entry': //allow for ring entries to be partially in next column
+        let acc_entry = 0;
+        for (let r = 0; r < segment.length; r++) {
+          const delta = ringOffset + (segment[r].length || 1);
+//console.log('r, acc_entry, delta', r, acc_entry, delta);
+          if (acc_entry + delta > total / 2) {
+            res = {ring: r, entry: Math.max(Math.floor(total / 2 - acc_entry - ringOffset), 0)};
+            break;
+          }
+					acc_entry += delta;
+        }
+        break;
+      case 'fixed': //always equal number of rings in column
+      default:
+        res = {ring: Math.ceil(segment.length / 2), entry: 0};
+    }
+    if (!res) res = {ring: segment.length-1, entry: 0};
+//console.log('legendSegmentSplitAt - res: ', res);
+    return res;
+  };
+
   if (config.quadrants.length < 2) throw new Error('Number of segments/quadrants to low');
 
   // custom random number generator, to make random sequence reproducible
@@ -196,7 +248,7 @@ function radar_visualization(config) {
   }
 
   config.radar_height = config.height;
-  if (Math.floor(quadrants.length / 2) * 2 < quadrants.length) {
+  if (!config.legend.no_middle && (Math.floor(quadrants.length / 2) * 2 < quadrants.length)) {
     //make space for middle segment legend on the bottom
     config.height += 18 //segment title
                   +  2 * (5+14+10) //ring headers
@@ -364,7 +416,7 @@ function radar_visualization(config) {
     for (let quadrant = 0; quadrant < quadrants.length; quadrant++) {
       const q = quadrants[quadrant];
       const half = Math.floor(quadrants.length / 2);
-      const legend_column = (quadrant < half) ? left : (quadrant >= quadrants.length - half ? right : middle);
+      const legend_column = config.legend.no_middle ? (quadrant <= half ? left : right) : ((quadrant < half) ? left : (quadrant >= quadrants.length - half ? right : middle));
       const legend_quadrant = legend_column.append("div")
         .style("flex","1")
         .style("justify-content","space-between")
@@ -378,41 +430,69 @@ function radar_visualization(config) {
         .style("flex-direction","row")
         .style("justify-content","flex-start");
 
-      let legend_quadrant_column;
-      for (let ring = 0; ring < rings.length; ring++) {
-        if (ring % 2 === 0) {
-          legend_quadrant_column = legend_quadrant.append("div")
+      const createLegendQuadrantColumn = (legend_quadrant) => legend_quadrant.append("div")
             .style("margin-right","10px")
             .style("margin-top","0px")
             .style("display","flex")
             .style("flex-wrap","wrap")
             .style("flex-direction","column")
             .style("justify-content","flex-start");
+
+      let legend_quadrant_column = createLegendQuadrantColumn(legend_quadrant);
+      const split_at = legendSegmentSplitAt(segmented[quadrant], quadrant, q.name);
+      for (let ring = 0; ring < rings.length; ring++) {
+        if ((split_at.ring === ring) && (split_at.entry === 0)) {
+          legend_quadrant_column = createLegendQuadrantColumn(legend_quadrant);
         }
 
-        const legend_ring = legend_quadrant_column.append("div")
+        const renderLegendRingWrapper = () => legend_quadrant_column.append("div")
           .style("display","flex")
           .style("margin-top","10px")
           .style("flex-grow","0")
           .style("flex-shrink","1")
           .style("flex-direction","column");
-        legend_ring.append("div")
+
+				let legend_ring_wrapper = renderLegendRingWrapper();
+        legend_ring_wrapper.append("div")
           .text(config.rings[ring].name)
           .style("margin-bottom","5px")
           .style("font-family","Arial, Helvetica")
           .style("font-size","12px")
           .style("font-weight","bold");
-        legend_ring.selectAll(".legend" + quadrant + ring)
-          .data(segmented[quadrant][ring])
+
+        if (segmented[quadrant][ring].length === 0) {
+          legend_ring_wrapper.append("div")
+            .attr("class", "legend" + quadrant + ring)
+            .text("-")
+            .style("font-family","Arial, Helvetica")
+            .style("font-size","11");
+          continue;
+        }
+
+        const renderLegendRing = (data) => legend_ring_wrapper.selectAll(".legend" + quadrant + ring)
+          .data(data)
           .enter()
             .append("div")
               .attr("class","legend" + quadrant + ring)
               .attr("id", function(d, i) { return "legendItem" + d.id; })
-              .text(function(d, i) { return d.id + ". " + d.label; })
+              .text(function(d, i) {
+                let label = d.label || "";
+                if ((config.legend.label_limit > 0) && (label.length > config.legend.label_limit + 3))
+                  label = label.substr(0,20) + '...'; 
+                return d.id + ". " + label;
+              })
               .style("font-family","Arial, Helvetica")
               .style("font-size","11")
               .on("mouseover", function(d) { showBubble(d); highlightLegendItem(d); })
               .on("mouseout", function(d) { hideBubble(d); unhighlightLegendItem(d); });
+        if ((split_at.ring !== ring) || (split_at.entry === 0)) {
+          renderLegendRing(segmented[quadrant][ring]);
+        } else {
+          renderLegendRing(segmented[quadrant][ring].slice(0, split_at.entry));
+          legend_quadrant_column = createLegendQuadrantColumn(legend_quadrant);
+          legend_ring_wrapper = renderLegendRingWrapper();
+          renderLegendRing(segmented[quadrant][ring].slice(split_at.entry));
+        }
       }
     }
 
