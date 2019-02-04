@@ -27,12 +27,11 @@ function radar_visualization(config) {
   config.legend.label_limit = config.legend.label_limit || 20;
   config.legend.no_middle = config.legend.no_middle || false;
   config.legend.split_mode = config.legend.split_mode || 'fixed';
+  config.segments = config.segments || config.quadrants; //for compatibility with original tech radar
 
-  const legendSegmentSplitAt = (segment, segment_idx, segment_name) => { //legendNextColumn(segment, ring) {
-//console.log('legendSegmentSplitAt - segment: ', segment, segment_idx, segment_name);
-    const ringOffset = 3; //equivalent number of entries for height of ring title
+  const legendSegmentSplitAt = (segment, segment_idx, segment_name) => {
+    const ringOffset = 3; //equivalent number of entries for height of the ring title
     const total = segment.reduce((acc,v) => acc + (v.length || 1), 0) + ringOffset * segment.length;
-//console.log('total: ', total);
     let res = null;
 
     switch (config.legend.split_mode) {
@@ -41,7 +40,6 @@ function radar_visualization(config) {
         for (let r = 0; r < segment.length; r++) {
           const delta = ringOffset + (segment[r].length || 1);
           const new_acc_ring = acc_ring + delta;
-//console.log('r, acc_ring, delta', r, acc_ring, delta);
           if (new_acc_ring > total / 2) {
             const height_split_before = Math.max(new_acc_ring, total - new_acc_ring);
             const height_split_after = Math.max(acc_ring, total - acc_ring);
@@ -58,12 +56,11 @@ function radar_visualization(config) {
         let acc_entry = 0;
         for (let r = 0; r < segment.length; r++) {
           const delta = ringOffset + (segment[r].length || 1);
-//console.log('r, acc_entry, delta', r, acc_entry, delta);
           if (acc_entry + delta > total / 2) {
             res = {ring: r, entry: Math.max(Math.floor(total / 2 - acc_entry - ringOffset), 0)};
             break;
           }
-					acc_entry += delta;
+          acc_entry += delta;
         }
         break;
       case 'fixed': //always equal number of rings in column
@@ -71,11 +68,10 @@ function radar_visualization(config) {
         res = {ring: Math.ceil(segment.length / 2), entry: 0};
     }
     if (!res) res = {ring: segment.length-1, entry: 0};
-//console.log('legendSegmentSplitAt - res: ', res);
     return res;
   };
 
-  if (config.quadrants.length < 2) throw new Error('Number of segments/quadrants to low');
+  if (config.segments.length < 2) throw new Error('Number of segments/quadrants to low');
 
   // custom random number generator, to make random sequence reproducible
   // source: https://stackoverflow.com/questions/521295
@@ -101,13 +97,13 @@ function radar_visualization(config) {
   ];
 
   // radial_min / radial_max are multiples of PI
-  const quadrants = config.quadrants;
+  const segments = config.segments;
   //start at vertical up line and go to the left
-  const radial_delta = 2 / quadrants.length;
+  const radial_delta = 2 / segments.length;
   let radial_max = 1.5;
-  for (let q = 0; q < quadrants.length; q++) {
-    quadrants[q].radial_max = radial_max;
-    quadrants[q].radial_min = radial_max - radial_delta;
+  for (let q = 0; q < segments.length; q++) {
+    segments[q].radial_max = radial_max;
+    segments[q].radial_min = radial_max - radial_delta;
     radial_max -= radial_delta;
   }
   
@@ -153,7 +149,7 @@ function radar_visualization(config) {
     if ((max_t_norm < min_t_norm) && (min_t < max_t)) {
       const t_lower = bounded_interval(polar.t, -Math.PI, min_t_norm);
       const t_upper = bounded_interval(polar.t, max_t_norm, Math.PI);
-			t = (t_upper < Math.PI) ? t_upper : t_lower;
+      t = (t_upper < Math.PI) ? t_upper : t_lower;
     } else {
       t = bounded_interval(polar.t, min_t_norm, max_t_norm);
     }
@@ -161,13 +157,13 @@ function radar_visualization(config) {
     return {t: t, r: r};
   }
 
-  function segment(quadrant, ring) {
+  function d3segment(segment, ring) {
     const polar_min = {
-      t: quadrants[quadrant].radial_min * Math.PI,
+      t: segments[segment].radial_min * Math.PI,
       r: ring == 0 ? 30 : rings[ring - 1].radius
     };
     const polar_max = {
-      t: quadrants[quadrant].radial_max * Math.PI,
+      t: segments[segment].radial_max * Math.PI,
       r: rings[ring].radius
     };
     return {
@@ -189,11 +185,15 @@ function radar_visualization(config) {
     }
   }
 
-  // filter entries with invalid quadrant
+  // filter entries with invalid segment
   for (let i = config.entries.length - 1; i >= 0; i--) {
     const entry = config.entries[i];
-    if (entry.quadrant >= quadrants.length) {
-      console.log('ignored entry - incorrect quadrant index in entry[' + i + ']', entry);
+    if (typeof entry.segment === 'undefined') {
+      //for backword compatibility with original tech radar
+      entry.segment = entry.quadrant;
+    }
+    if (entry.segment >= segments.length) {
+      console.log('ignored entry - incorrect segment/quadrant index in entry[' + i + ']', entry);
       config.entries.splice(i, 1);
     }
   }
@@ -201,8 +201,8 @@ function radar_visualization(config) {
   // position each entry randomly in its segment
   for (let i = 0; i < config.entries.length; i++) {
     const entry = config.entries[i];
-    entry.segment = segment(entry.quadrant, entry.ring);
-    const point = entry.segment.random();
+    entry.d3segment = d3segment(entry.segment, entry.ring);
+    const point = entry.d3segment.random();
     entry.x = point.x;
     entry.y = point.y;
     entry.color = entry.active || config.print_layout ?
@@ -210,23 +210,23 @@ function radar_visualization(config) {
   }
 
   // partition entries according to segments
-  const segmented = new Array(quadrants.length);
-  for (let quadrant = 0; quadrant < quadrants.length; quadrant++) {
-    segmented[quadrant] = new Array(rings.length);
+  const segmented = new Array(segments.length);
+  for (let segment = 0; segment < segments.length; segment++) {
+    segmented[segment] = new Array(rings.length);
     for (let ring = 0; ring < rings.length; ring++) {
-      segmented[quadrant][ring] = [];
+      segmented[segment][ring] = [];
     }
   }
   for (let i = 0; i < config.entries.length; i++) {
     const entry = config.entries[i];
-    segmented[entry.quadrant][entry.ring].push(entry);
+    segmented[entry.segment][entry.ring].push(entry);
   }
 
   // assign unique sequential id to each entry
   let id = 1;
-  for (let quadrant = 0; quadrant < quadrants.length; quadrant++) {
+  for (let segment = 0; segment < segments.length; segment++) {
     for (let ring = 0; ring < 4; ring++) {
-      const entries = segmented[quadrant][ring];
+      const entries = segmented[segment][ring];
       entries.sort(function(a,b) { return a.label.localeCompare(b.label); })
       for (let i = 0; i < entries.length; i++) {
         entries[i].id = "" + id++;
@@ -238,22 +238,22 @@ function radar_visualization(config) {
     return "translate(" + x + "," + y + ")";
   }
 
-  function viewbox(quadrant) {
+  function viewbox(segment) {
     return [
-      Math.max(0, quadrants[quadrant].factor_x * 400) - 420,
-      Math.max(0, quadrants[quadrant].factor_y * 400) - 420,
+      Math.max(0, segments[segment].factor_x * 400) - 420,
+      Math.max(0, segments[segment].factor_y * 400) - 420,
       440,
       440
     ].join(" ");
   }
 
   config.radar_height = config.height;
-  if (!config.legend.no_middle && (Math.floor(quadrants.length / 2) * 2 < quadrants.length)) {
+  if (!config.legend.no_middle && segments.length % 2 !== 0) {
     //make space for middle segment legend on the bottom
     config.height += 18 //segment title
                   +  2 * (5+14+10) //ring headers
                   -  60; //initial bottom margin reduction
-    const middle_entries = segmented[Math.floor(quadrants.length / 2)];
+    const middle_entries = segmented[Math.floor(segments.length / 2)];
     let max_column_entries = 0;
     let column_entries = 0;
     for (let r = 0; r < middle_entries.length; r++) {
@@ -296,14 +296,14 @@ function radar_visualization(config) {
   const grid = radar.append("g");
 
   // draw grid lines and segment labels
-  for (let quadrant = 0; quadrant < quadrants.length; quadrant++) {
+  for (let segment = 0; segment < segments.length; segment++) {
     const polar_min = {
-      t: quadrants[quadrant].radial_min * Math.PI,
+      t: segments[segment].radial_min * Math.PI,
       r: rings[rings.length - 1].radius
     };
     const cartesian_min = cartesian(polar_min);
     const polar_max = {
-      t: quadrants[quadrant].radial_max * Math.PI,
+      t: segments[segment].radial_max * Math.PI,
       r: rings[rings.length - 1].radius
     };
     const cartesian_max = cartesian(polar_max);
@@ -318,14 +318,14 @@ function radar_visualization(config) {
       .attr("x2", cartesian_max.x).attr("y2", cartesian_max.y)
       .style("stroke", config.colors.grid)
       .style("stroke-width", 1);
-    if (config.print_layout && quadrants[quadrant].symbol) {
+    if (config.print_layout && segments[segment].symbol) {
       const polar_label = {
         t: (polar_min.t + polar_max.t) / 2,
         r: (rings[rings.length - 1].radius + rings[rings.length - 2].radius) / 2
       };
       const cartesian_label = cartesian(polar_label);
       grid.append("text")
-        .text(quadrants[quadrant].symbol)
+        .text(segments[segment].symbol)
         .attr("x", cartesian_label.x)
         .attr("y", cartesian_label.y)
         .attr("text-anchor", "middle")
@@ -399,7 +399,7 @@ function radar_visualization(config) {
       .style("flex-grow", "1")
       .style("margin-left", "50px")
       .style("margin-top", "20px")
-			.attr("class", "radar-legend");
+      .attr("class", "radar-legend");
     const left = legend.append("div")
       .style("display","flex")
       .style("flex-wrap","nowrap")
@@ -413,11 +413,26 @@ function radar_visualization(config) {
       .style("display","flex")
       .style("flex-wrap","nowrap")
       .style("flex-direction","column-reverse");
-    for (let quadrant = 0; quadrant < quadrants.length; quadrant++) {
-      const q = quadrants[quadrant];
-      const half = Math.floor(quadrants.length / 2);
-      const legend_column = config.legend.no_middle ? (quadrant <= half ? left : right) : ((quadrant < half) ? left : (quadrant >= quadrants.length - half ? right : middle));
-      const legend_quadrant = legend_column.append("div")
+
+    const selectColumn = (no_middle, segment, left, middle, right, segment_count) => {
+      const half_floor = Math.floor(segment_count / 2);
+      let left_limit = half_floor - 1;
+      if (segment_count % 2 !== 0 && no_middle) left_limit = half_floor;
+      const res = {left_limit: left_limit};
+      if (segment <= left_limit) {
+        res.column = left;
+      } else if (no_middle) {
+        res.column = right;
+      } else {
+        res.column = (segment < segment_count - half_floor) ? middle : right;
+      }
+      return res;
+    };
+
+    for (let segment = 0; segment < segments.length; segment++) {
+      const q = segments[segment];
+      const legend_column = selectColumn(config.legend.no_middle, segment, left, middle, right, segments.length);
+      const legend_segment = legend_column.column.append("div")
         .style("flex","1")
         .style("justify-content","space-between")
         .style("margin-top","0px")
@@ -430,7 +445,11 @@ function radar_visualization(config) {
         .style("flex-direction","row")
         .style("justify-content","flex-start");
 
-      const createLegendQuadrantColumn = (legend_quadrant) => legend_quadrant.append("div")
+      if (legend_column.column !== middle && segment !== legend_column.left_limit) {
+        legend_segment.style("margin-bottom","20px");
+      }
+
+      const createLegendSegmentColumn = (legend_segment) => legend_segment.append("div")
             .style("margin-right","10px")
             .style("margin-top","0px")
             .style("display","flex")
@@ -438,21 +457,21 @@ function radar_visualization(config) {
             .style("flex-direction","column")
             .style("justify-content","flex-start");
 
-      let legend_quadrant_column = createLegendQuadrantColumn(legend_quadrant);
-      const split_at = legendSegmentSplitAt(segmented[quadrant], quadrant, q.name);
+      let legend_segment_column = createLegendSegmentColumn(legend_segment);
+      const split_at = legendSegmentSplitAt(segmented[segment], segment, q.name);
       for (let ring = 0; ring < rings.length; ring++) {
         if ((split_at.ring === ring) && (split_at.entry === 0)) {
-          legend_quadrant_column = createLegendQuadrantColumn(legend_quadrant);
+          legend_segment_column = createLegendSegmentColumn(legend_segment);
         }
 
-        const renderLegendRingWrapper = () => legend_quadrant_column.append("div")
+        const renderLegendRingWrapper = () => legend_segment_column.append("div")
           .style("display","flex")
           .style("margin-top","10px")
           .style("flex-grow","0")
           .style("flex-shrink","1")
           .style("flex-direction","column");
 
-				let legend_ring_wrapper = renderLegendRingWrapper();
+        let legend_ring_wrapper = renderLegendRingWrapper();
         legend_ring_wrapper.append("div")
           .text(config.rings[ring].name)
           .style("margin-bottom","5px")
@@ -460,20 +479,20 @@ function radar_visualization(config) {
           .style("font-size","12px")
           .style("font-weight","bold");
 
-        if (segmented[quadrant][ring].length === 0) {
+        if (segmented[segment][ring].length === 0) {
           legend_ring_wrapper.append("div")
-            .attr("class", "legend" + quadrant + ring)
+            .attr("class", "legend" + segment + ring)
             .text("-")
             .style("font-family","Arial, Helvetica")
             .style("font-size","11");
           continue;
         }
 
-        const renderLegendRing = (data) => legend_ring_wrapper.selectAll(".legend" + quadrant + ring)
+        const renderLegendRing = (data) => legend_ring_wrapper.selectAll(".legend" + segment + ring)
           .data(data)
           .enter()
             .append("div")
-              .attr("class","legend" + quadrant + ring)
+              .attr("class","legend" + segment + ring)
               .attr("id", function(d, i) { return "legendItem" + d.id; })
               .text(function(d, i) {
                 let label = d.label || "";
@@ -486,12 +505,12 @@ function radar_visualization(config) {
               .on("mouseover", function(d) { showBubble(d); highlightLegendItem(d); })
               .on("mouseout", function(d) { hideBubble(d); unhighlightLegendItem(d); });
         if ((split_at.ring !== ring) || (split_at.entry === 0)) {
-          renderLegendRing(segmented[quadrant][ring]);
+          renderLegendRing(segmented[segment][ring]);
         } else {
-          renderLegendRing(segmented[quadrant][ring].slice(0, split_at.entry));
-          legend_quadrant_column = createLegendQuadrantColumn(legend_quadrant);
+          renderLegendRing(segmented[segment][ring].slice(0, split_at.entry));
+          legend_segment_column = createLegendSegmentColumn(legend_segment);
           legend_ring_wrapper = renderLegendRingWrapper();
-          renderLegendRing(segmented[quadrant][ring].slice(split_at.entry));
+          renderLegendRing(segmented[segment][ring].slice(split_at.entry));
         }
       }
     }
@@ -620,7 +639,7 @@ function radar_visualization(config) {
   // make sure that blips stay inside their segment
   function ticked() {
     blips.attr("transform", function(d) {
-    d.segment.clip(d);
+    d.d3segment.clip(d);
       return translate(d.x, d.y);
     })
   }
